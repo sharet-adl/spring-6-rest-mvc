@@ -1,6 +1,6 @@
 package guru.springframework.spring6restmvc.service;
 
-import guru.springframework.spring6restmvc.model.Customer;
+import guru.springframework.spring6restmvc.model.CustomerDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -9,12 +9,12 @@ import java.util.*;
 
 @Service
 public class CustomerService implements ICustomerService {
-    private Map<UUID, Customer> customerMap;
+    private Map<UUID, CustomerDTO> customerMap;
 
     public CustomerService() {
         customerMap = new HashMap<>();
 
-        Customer cust1 = Customer.builder()
+        CustomerDTO cust1 = CustomerDTO.builder()
                 .name("C1")
                 .id(UUID.randomUUID())
                 .version(1)
@@ -22,7 +22,7 @@ public class CustomerService implements ICustomerService {
                 .lastModifiedDate(LocalDateTime.now())
                 .build();
 
-        Customer cust2 = Customer.builder()
+        CustomerDTO cust2 = CustomerDTO.builder()
                 .name("C2")
                 .id(UUID.randomUUID())
                 .version(1)
@@ -35,18 +35,18 @@ public class CustomerService implements ICustomerService {
     }
 
     @Override
-    public Customer getCustomerById(UUID id) {
-        return customerMap.get(id);
-    }
-
-    @Override
-    public List<Customer> listAllCustomer() {
+    public List<CustomerDTO> listCustomers() {
         return new ArrayList<>(customerMap.values());
     }
 
     @Override
-    public Customer saveNewCustomer(Customer customer) {
-        Customer newCustomer = Customer.builder()
+    public Optional<CustomerDTO> getCustomerById(UUID id) {
+        return Optional.of(customerMap.get(id));
+    }
+
+    @Override
+    public CustomerDTO saveNewCustomer(CustomerDTO customer) {
+        CustomerDTO newCustomer = CustomerDTO.builder()
                 .id(customer.getId())
                 .createdDate(LocalDateTime.now())
                 .lastModifiedDate(LocalDateTime.now())
@@ -57,27 +57,30 @@ public class CustomerService implements ICustomerService {
     }
 
     @Override
-    public Customer updateCustomerById(UUID id, Customer customer) {
-        Customer existing = customerMap.get(id);
+    public Optional<CustomerDTO> updateCustomerById(UUID id, CustomerDTO customer) {
+        CustomerDTO existing = customerMap.get(id);
         if(true) {
             existing.setName(customer.getName());
             existing.setVersion(customer.getVersion());
         }
         // not needed - but reminder to invoke SAVE when using real repositories
         //customerMap.put(id, existing);
-        return existing;
+        return Optional.of(existing);
     }
 
-    public void deleteById(UUID id) {
+    public Boolean deleteById(UUID id) {
         customerMap.remove(id);
+        return true;
     }
 
     @Override
-    public void patchById(UUID customerId, Customer customer) {
-        Customer existing = customerMap.get(customerId);
+    public Optional<CustomerDTO> patchById(UUID customerId, CustomerDTO customer) {
+        CustomerDTO existing = customerMap.get(customerId);
 
         if(StringUtils.hasText(customer.getName())) {
             existing.setName(customer.getName());
         }
+
+        return Optional.of(existing);
     }
 }

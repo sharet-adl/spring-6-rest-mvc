@@ -2,10 +2,10 @@ package guru.springframework.spring6restmvc.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import guru.springframework.spring6restmvc.model.Beer;
+import guru.springframework.spring6restmvc.entities.Beer;
+import guru.springframework.spring6restmvc.model.BeerDTO;
 import guru.springframework.spring6restmvc.service.BeerService;
 import guru.springframework.spring6restmvc.service.IBeerService;
-import net.bytebuddy.pool.TypePool;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 //import static net.bytebuddy.matcher.ElementMatchers.is;  // IntelliJ misuses the byteBuddy instead of org.hamcrest.core.Is.is
 import java.util.HashMap;
@@ -55,7 +56,7 @@ class BeerControllerTestL2 {
     ArgumentCaptor<UUID> uuidArgCaptor;
 
     @Captor
-    ArgumentCaptor<Beer> beerArgCaptor;
+    ArgumentCaptor<BeerDTO> beerArgCaptor;
 
     @BeforeEach
     void setUp() {
@@ -65,7 +66,7 @@ class BeerControllerTestL2 {
     @Test
     void getBeerById() throws Exception {
         // acts as dummy call to also initialize the internal map with content
-        Beer testBeer = beerSvcImpl.listBeers().get(0);
+        BeerDTO testBeer = beerSvcImpl.listBeers().get(0);
 
         //given(beerService.getBeerById(any(UUID.class))).willReturn(testBear);
         given(beerService.getBeerById(testBeer.getId())).willReturn(Optional.of(testBeer));
@@ -96,19 +97,19 @@ class BeerControllerTestL2 {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
 
-        Beer beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers().get(0);
 
         System.out.println(objectMapper.writeValueAsString(beer));
     }
 
     @Test
     void testCreateNewBeer2() throws Exception {
-        Beer beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers().get(0);
         //System.out.println(objectMapper.writeValueAsString(beer));
         beer.setVersion(null);
         beer.setId(null);
 
-        given(beerService.saveNewBeer(any(Beer.class))).willReturn(beerSvcImpl.listBeers().get(1));
+        given(beerService.saveNewBeer(any(BeerDTO.class))).willReturn(beerSvcImpl.listBeers().get(1));
 
         mockMvc.perform(post("/api/v1/beer")
                         .accept(MediaType.APPLICATION_JSON)
@@ -120,7 +121,9 @@ class BeerControllerTestL2 {
 
     @Test
     void testUpdateBeer() throws Exception {
-        Beer beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+
+        given(beerService.updateBeerById(any(), any())).willReturn(Optional.of(beer));
 
         mockMvc.perform(put("/api/v1/beer/" + beer.getId())
                         .accept(MediaType.APPLICATION_JSON)
@@ -129,12 +132,15 @@ class BeerControllerTestL2 {
                 .andExpect(status().isNoContent());  // HTTP 204
 
         // alternative to any UUID --> argument capture
-        verify(beerService).updateBeerById(any(UUID.class), any(Beer.class));
+        verify(beerService).updateBeerById(any(UUID.class), any(BeerDTO.class));
     }
 
     @Test
     void testDeleteBeer() throws Exception {
-        Beer beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+
+        // Mockito would return the default value = false, so need to tell it explicitly what to return
+        given(beerService.deleteById(any())).willReturn(true);
 
         // try DRY refactoring
         //mockMvc.perform(delete(BeerController.BASE_PATH, "/", beer.getId())
@@ -154,7 +160,7 @@ class BeerControllerTestL2 {
 
     @Test
     void testPatchBeer() throws Exception {
-        Beer beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers().get(0);
 
         // set some adhoc JSON for testing
         // not sending fully qualified object, but only the modified properties
@@ -171,7 +177,6 @@ class BeerControllerTestL2 {
 
         assertThat(beer.getId()).isEqualTo(uuidArgCaptor.getValue());
         assertThat(beerMap.get("beerName")).isEqualTo(beerArgCaptor.getValue().getBeerName());
-
     }
 
     @Test
@@ -181,5 +186,37 @@ class BeerControllerTestL2 {
 
         mockMvc.perform(get(BeerController.BASE_PATH + "/" + UUID.randomUUID()))
                 .andExpect(status().isNotFound());
+    }
+
+    // Data Validation - Controller Binding validation
+    // validate badReq status and number of error messages
+    @Test
+    void testCreateBeerNullBeerName() throws Exception {
+        BeerDTO beerDTO = BeerDTO.builder().build();
+
+        given(beerService.saveNewBeer(any(BeerDTO.class))).willReturn(beerSvcImpl.listBeers().get(1));
+        MvcResult mvcResult = mockMvc.perform(post("/api/v1/beer")
+                    .accept(MediaType.APPLICATION_JSON)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(beerDTO)))
+                .andExpect(jsonPath("$.length()", is(6)))
+                .andExpect(status().isBadRequest()).andReturn();
+
+        System.out.println(mvcResult.getResponse().getContentAsString());
+    }
+
+    @Test
+    void testUpdateBeerBlankName() throws Exception {
+        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+        beer.setBeerName("");
+
+        given(beerService.updateBeerById(any(), any())).willReturn(Optional.of(beer));
+
+        mockMvc.perform(put("/api/v1/beer/" + beer.getId())
+                        .accept(MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(beer)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.length()", is(1)));
     }
 }

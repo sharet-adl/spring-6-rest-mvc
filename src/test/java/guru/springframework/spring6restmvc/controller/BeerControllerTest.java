@@ -10,7 +10,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-// Level1
+// full context, no mocking
 @SpringBootTest
 @WebMvcTest(BeerController.class)
 class BeerControllerTest {
