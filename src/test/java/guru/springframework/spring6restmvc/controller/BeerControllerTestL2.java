@@ -2,7 +2,6 @@ package guru.springframework.spring6restmvc.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import guru.springframework.spring6restmvc.entities.Beer;
 import guru.springframework.spring6restmvc.model.BeerDTO;
 import guru.springframework.spring6restmvc.service.BeerService;
 import guru.springframework.spring6restmvc.service.IBeerService;
@@ -13,6 +12,7 @@ import org.mockito.Captor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -66,7 +66,7 @@ class BeerControllerTestL2 {
     @Test
     void getBeerById() throws Exception {
         // acts as dummy call to also initialize the internal map with content
-        BeerDTO testBeer = beerSvcImpl.listBeers().get(0);
+        BeerDTO testBeer = beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(0);
 
         //given(beerService.getBeerById(any(UUID.class))).willReturn(testBear);
         given(beerService.getBeerById(testBeer.getId())).willReturn(Optional.of(testBeer));
@@ -83,13 +83,16 @@ class BeerControllerTestL2 {
 
     @Test
     void testListBeer() throws Exception {
-        given(beerService.listBeers()).willReturn(beerSvcImpl.listBeers());
+        // given(beerService.listBeers(any(), any(), any() ))
+        given(beerService.listBeers(null, null, null, 1, 25)).willReturn(beerSvcImpl.listBeers(null, null, null, 1, 25));
 
         mockMvc.perform(get("/api/v1/beer")
-                .accept(MediaType.APPLICATION_JSON))
+                .accept(MediaType.APPLICATION_JSON)
+                //.contentType(MediaType.APPLICATION_JSON)
+                )
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.length()", is(3)));
+                .andExpect(jsonPath("$.content.size()", is(3)));
     }
 
     @Test
@@ -97,19 +100,19 @@ class BeerControllerTestL2 {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
 
-        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(0);
 
         System.out.println(objectMapper.writeValueAsString(beer));
     }
 
     @Test
     void testCreateNewBeer2() throws Exception {
-        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(0);
         //System.out.println(objectMapper.writeValueAsString(beer));
         beer.setVersion(null);
         beer.setId(null);
 
-        given(beerService.saveNewBeer(any(BeerDTO.class))).willReturn(beerSvcImpl.listBeers().get(1));
+        given(beerService.saveNewBeer(any(BeerDTO.class))).willReturn(beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(1));
 
         mockMvc.perform(post("/api/v1/beer")
                         .accept(MediaType.APPLICATION_JSON)
@@ -121,7 +124,7 @@ class BeerControllerTestL2 {
 
     @Test
     void testUpdateBeer() throws Exception {
-        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(0);
 
         given(beerService.updateBeerById(any(), any())).willReturn(Optional.of(beer));
 
@@ -137,7 +140,7 @@ class BeerControllerTestL2 {
 
     @Test
     void testDeleteBeer() throws Exception {
-        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(0);
 
         // Mockito would return the default value = false, so need to tell it explicitly what to return
         given(beerService.deleteById(any())).willReturn(true);
@@ -160,7 +163,7 @@ class BeerControllerTestL2 {
 
     @Test
     void testPatchBeer() throws Exception {
-        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(0);
 
         // set some adhoc JSON for testing
         // not sending fully qualified object, but only the modified properties
@@ -194,7 +197,7 @@ class BeerControllerTestL2 {
     void testCreateBeerNullBeerName() throws Exception {
         BeerDTO beerDTO = BeerDTO.builder().build();
 
-        given(beerService.saveNewBeer(any(BeerDTO.class))).willReturn(beerSvcImpl.listBeers().get(1));
+        given(beerService.saveNewBeer(any(BeerDTO.class))).willReturn(beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(1));
         MvcResult mvcResult = mockMvc.perform(post("/api/v1/beer")
                     .accept(MediaType.APPLICATION_JSON)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -207,7 +210,7 @@ class BeerControllerTestL2 {
 
     @Test
     void testUpdateBeerBlankName() throws Exception {
-        BeerDTO beer = beerSvcImpl.listBeers().get(0);
+        BeerDTO beer = beerSvcImpl.listBeers(null, null, null, 1, 25).getContent().get(0);
         beer.setBeerName("");
 
         given(beerService.updateBeerById(any(), any())).willReturn(Optional.of(beer));

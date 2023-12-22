@@ -1,11 +1,18 @@
 package guru.springframework.spring6restmvc.repositories;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import guru.springframework.spring6restmvc.entities.Customer;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +35,10 @@ class CustomerRepositoryTest {
         Assertions.assertThat(savedCustomer).isNotNull();
         Assertions.assertThat(savedCustomer.getId()).isNotNull();
     }
+
+    // --------------------------------------------------------------------------
+    // EXTRA TESTING
+    // --------------------------------------------------------------------------
 
     @Test
     void testConversions() {
@@ -71,9 +82,9 @@ class CustomerRepositoryTest {
         };
 
         Optional<Object[]> parsed = tryConvertArrayFromObject((Object)objects);
-        if (! objects.isEmpty() && parsed.get().length > 0 && Arrays.stream(parsed.get()).anyMatch(CustomerRepositoryTest::doStuff)) {
-            ;
-        }
+//        if (! objects.isEmpty() && parsed.get().length > 0 && Arrays.stream(parsed.get()).anyMatch(CustomerRepositoryTest::doStuff)) {
+//            ;
+//        }
 
     }
 
@@ -110,6 +121,45 @@ class CustomerRepositoryTest {
             return Optional.of(ret);
         }
         return Optional.empty();
+    }
+
+    // --------------------------------------------------------------------------
+    // EXTRA TESTING
+    // --------------------------------------------------------------------------
+
+    public static ObjectMapper createYamlMapper() {
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory()
+                .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+                .disable(YAMLGenerator.Feature.SPLIT_LINES)
+                .disable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE));
+        mapper.findAndRegisterModules();
+        return mapper;
+    }
+
+    public static ObjectMapper createJsonMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        // JsonNode node = mapper.createObjectNode();
+        // JsonNode node = JsonNodeFactory.instance.objectNode();
+        // JsonNode node = mapper.valueToTree(fromValue);
+        return mapper;
+    }
+
+    @Test
+    public void givenANode_whenModifyingIt_thenCorrect() throws IOException {
+        String newString1 = "{\"nick\": \"cowtowncoder\"}";
+        String newString2 = "{\"kind\": \"ConfigMap\",\"version\": \"1.2.3\"}";
+        String newString3 = "{\"services\":{\"s1\":{\"fld\": \"val1\"},\"s2\":{\"fld\": \"val2\"}}}";
+        ObjectMapper mapper = createJsonMapper();
+        JsonNode newNode1 = mapper.readTree(newString1);
+        JsonNode newNode2 = mapper.readTree(newString2);
+        JsonNode newNode3 = mapper.readTree(newString3);
+
+        // tree.path("metadata").path("name").isMissingNode()
+        ((ObjectNode) newNode2).set("name", newNode1);
+
+        assertFalse(newNode2.path("name").path("nick").isMissingNode());
+        assertEquals("cowtowncoder", newNode2.path("name").path("nick").textValue());
     }
 
 

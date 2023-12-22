@@ -3,6 +3,8 @@ package guru.springframework.spring6restmvc.service;
 import guru.springframework.spring6restmvc.model.BeerDTO;
 import guru.springframework.spring6restmvc.model.BeerStyle;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -60,8 +62,8 @@ public class BeerService implements IBeerService {
     }
 
     @Override
-    public List<BeerDTO> listBeers() {
-        return new ArrayList<>(beerMap.values());
+    public Page<BeerDTO> listBeers(String beerName, BeerStyle beerStyle, Boolean showInventory, Integer pageNumber, Integer pageSize) {
+        return new PageImpl<>(new ArrayList<>(beerMap.values()));
     }
 
     @Override

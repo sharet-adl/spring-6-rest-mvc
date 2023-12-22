@@ -4,22 +4,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import guru.springframework.spring6restmvc.entities.Beer;
 import guru.springframework.spring6restmvc.mappers.IBeerMapper;
 import guru.springframework.spring6restmvc.model.BeerDTO;
+import guru.springframework.spring6restmvc.model.BeerStyle;
 import guru.springframework.spring6restmvc.repositories.IBeerRepository;
-import guru.springframework.spring6restmvc.service.IBeerService;
-import net.bytebuddy.build.ToStringPlugin;
-import org.assertj.core.api.Assertions;
+import org.hamcrest.core.IsNull;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.annotation.Rollback;
-import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MockMvcBuilder;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +29,15 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.core.Is.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 
 // old @WebMvcTest - not full context, see below
 @SpringBootTest
@@ -71,8 +74,10 @@ class BeerControllerIT {
 
     @Test
     void testListBeers() {
-        List<BeerDTO> dtos = beerController.listBeers();
-        assertThat(dtos.size()).isEqualTo(3);
+        Page<BeerDTO> dtos = beerController.listBeers(null, null, null, 1, 1000);
+
+        // we had set a hardcodwed limit of max 1000 records, otherwise should return: 3 + 2410
+        assertThat(dtos.getContent().size()).isEqualTo(1000);
     }
 
     @Rollback
@@ -80,8 +85,8 @@ class BeerControllerIT {
     @Test
     void testEmptyList() {
         beerRepository.deleteAll();
-        List<BeerDTO> dtos = beerController.listBeers();
-        assertThat(dtos.size()).isEqualTo(0);
+        Page<BeerDTO> dtos = beerController.listBeers(null, null, null, 1, 25);
+        assertThat(dtos.getContent().size()).isEqualTo(0);
     }
 
     @Test
@@ -185,4 +190,109 @@ class BeerControllerIT {
         System.out.println(result.getResponse().getContentAsString());
     }
 
+    @Test
+    void testListBeersByName() throws Exception {
+        // could use Mocks, but easier to use IT context
+        mockMvc.perform(get(BeerController.BASE_PATH)
+                .queryParam("beerName", "IPA"))
+                .andExpect(status().isOk())
+                //.andExpect(jsonPath("$.content.size()", is(336)));
+                .andExpect(jsonPath("$.content.size()", is(25)));
+    }
+
+    @Test
+    void testListBeersByStyle() throws Exception {
+        // could use Mocks, but easier to use IT context
+        mockMvc.perform(get(BeerController.BASE_PATH)
+                        .queryParam("beerStyle", BeerStyle.IPA.name())
+                        .queryParam("pageSize", "800"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.size()", is(547)));
+                //.andExpect(jsonPath("$.content.size()", is(25)));
+    }
+
+    @Test
+    void testListBeersByNameAndStyle() throws Exception {
+        // could use Mocks, but easier to use IT context
+        mockMvc.perform(get(BeerController.BASE_PATH)
+                        .queryParam("beerName", "IPA")
+                        .queryParam("beerStyle", BeerStyle.IPA.name()))
+                .andExpect(status().isOk())
+                //.andExpect(jsonPath("$.size()", is(310)));
+                .andExpect(jsonPath("$.content.size()", is(25)));
+    }
+
+    @Test
+    void testListBeersByNameAndStyleShowInventoryFalse() throws Exception {
+        // could use Mocks, but easier to use IT context
+        mockMvc.perform(get(BeerController.BASE_PATH)
+                        .queryParam("beerName", "IPA")
+                        .queryParam("beerStyle", BeerStyle.IPA.name())
+                        .queryParam("showInventory", "false"))
+                .andExpect(status().isOk())
+                //.andExpect(jsonPath("$.size()", is(310)))
+                .andExpect(jsonPath("$.content.size()", is(25)))
+                .andExpect(jsonPath("$.content[0].quantityOnHand").value(IsNull.nullValue()));
+    }
+
+    @Test
+    void testListBeersByNameAndStyleShowInventoryTrue() throws Exception {
+        // could use Mocks, but easier to use IT context
+        mockMvc.perform(get(BeerController.BASE_PATH)
+                        .queryParam("beerName", "IPA")
+                        .queryParam("beerStyle", BeerStyle.IPA.name())
+                        .queryParam("showInventory", "true"))
+                .andExpect(status().isOk())
+                //.andExpect(jsonPath("$.content.size()", is(310)))
+                .andExpect(jsonPath("$.content.size()", is(25)))
+                .andExpect(jsonPath("$.content[0].quantityOnHand").value(IsNull.notNullValue()));
+    }
+
+    @Test
+    void testListBeersByNameAndStyleShowInventoryTruePage2() throws Exception {
+        // could use Mocks, but easier to use IT context
+        mockMvc.perform(get(BeerController.BASE_PATH)
+                        .queryParam("beerName", "IPA")
+                        .queryParam("beerStyle", BeerStyle.IPA.name())
+                        .queryParam("showInventory", "true")
+                        .queryParam("pageNumber", "2")
+                        .queryParam("pageSize", "50")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.size()", is(50)))
+                .andExpect(jsonPath("$.content[0].quantityOnHand").value(IsNull.notNullValue()));
+    }
+
+    @Disabled // just for demo purposes - OptimisticLocking - ObjectOptimisticLockingFailureException
+    @Test
+    void testUpdateBeerBadVersion() throws Exception {
+        // Do 2 updates and 2 saves, on top of exact same version of an object... second one should throw exceptio in general..
+        //   When service-save method is working in 'detached' mode ( just takes the object and tries to save ), second call would fail
+        //   When service-save method is doing get/ it will known it is already in a transaction and wait until second one to comit ..
+        Beer beer = beerRepository.findAll().get(0);
+
+        BeerDTO beerDTO = beerMapper.beerToBeerDto(beer);
+
+        beerDTO.setBeerName("Updated Name");
+
+        MvcResult result = mockMvc.perform(put(BeerController.BASE_PATH_ID, beer.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(beerDTO)))
+                .andExpect(status().isNoContent())
+                .andReturn();
+
+        System.out.println(result.getResponse().getContentAsString());
+
+        beerDTO.setBeerName("Updated Name 2");
+
+        MvcResult result2 = mockMvc.perform(put(BeerController.BASE_PATH_ID, beer.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(beerDTO)))
+                .andExpect(status().isNoContent())
+                .andReturn();
+
+        System.out.println(result2.getResponse().getStatus());
+    }
 }
